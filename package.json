@@ -1,0 +1,28 @@
+{
+  "name": "nvf-finanzen",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "NvF Finanzen – Einnahmen-/Ausgaben-App für NvF Digital",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:vorschau": "vite build --mode vorschau",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "idb": "^8.0.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tailwindcss": "^4.3.5",
+    "vite": "^8.3.6",
+    "vite-plugin-pwa": "^2.0.0",
+    "vite-plugin-singlefile": "^2.3.4",
+    "vitest": "^5.1.0"
+  }
+}
