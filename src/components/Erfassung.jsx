@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp, kategorienDerArt } from '../lib/store.jsx'
 import { centZuEingabe, heuteISO, parseBetrag } from '../lib/format.js'
-import { Blatt, KategorieSymbol } from './ui.jsx'
+import { kategorieFuerAnbieter } from '../lib/auswertung.js'
+import { belegVorbereiten } from '../lib/bild.js'
+import { Blatt, KategorieSymbol, Rueckfrage } from './ui.jsx'
 import { BelegAnsicht, BelegKachel } from './BelegAnzeige.jsx'
 import { IconBild, IconKamera, IconPdf, IconSchliessen, IconPlus } from './Icons.jsx'
 
@@ -68,6 +70,21 @@ export function Erfassung({ art, buchung, onSchliessen }) {
   const [fehler, setFehler] = useState({})
   const [speichert, setSpeichert] = useState(false)
   const [ansicht, setAnsicht] = useState(null)
+  const [belegEntfernen, setBelegEntfernen] = useState(null) // gespeicherter Beleg, der weg soll
+  const [verwerfenFragen, setVerwerfenFragen] = useState(false)
+  // 'hand' = selbst gewählt, 'auto' = nach Anbieter vorgeschlagen
+  const [kategorieQuelle, setKategorieQuelle] = useState(buchung ? 'hand' : null)
+
+  // Ausgangswerte, um ungespeicherte Änderungen zu erkennen
+  const start = useRef({ betrag, datum, anbieter, kategorieId, notiz }).current
+  const geaendert =
+    neueDateien.length > 0 ||
+    entfernteBelegIds.length > 0 ||
+    betrag !== start.betrag ||
+    datum !== start.datum ||
+    anbieter !== start.anbieter ||
+    kategorieId !== start.kategorieId ||
+    notiz !== start.notiz
 
   // Fehlermeldung eines Feldes verschwindet, sobald es geändert wird
   const aendern = (setter, feld) => (wert) => {
@@ -89,6 +106,30 @@ export function Erfassung({ art, buchung, onSchliessen }) {
     return [...namen].sort((a, b) => a.localeCompare(b, 'de'))
   }, [buchungen, art])
 
+  // Bekannter Anbieter -> zuletzt benutzte Kategorie vorschlagen, solange nicht selbst gewählt
+  function anbieterAendern(wert) {
+    aendern(setAnbieter, 'anbieter')(wert)
+    if (kategorieQuelle === 'hand') return
+    const vorschlag = kategorieFuerAnbieter(buchungen, art, wert)
+    if (vorschlag && passendeKategorien.some((k) => k.id === vorschlag)) {
+      aendern(setKategorieId, 'kategorie')(vorschlag)
+      setKategorieQuelle('auto')
+    } else if (kategorieQuelle === 'auto') {
+      setKategorieId('')
+      setKategorieQuelle(null)
+    }
+  }
+
+  function kategorieWaehlen(id) {
+    aendern(setKategorieId, 'kategorie')(id)
+    setKategorieQuelle('hand')
+  }
+
+  function schliessenVersuchen() {
+    if (geaendert && !speichert) setVerwerfenFragen(true)
+    else onSchliessen()
+  }
+
   function dateienGewaehlt(e) {
     const dateien = [...(e.target.files || [])]
     if (dateien.length) setNeueDateien((d) => [...d, ...dateien])
@@ -108,6 +149,9 @@ export function Erfassung({ art, buchung, onSchliessen }) {
 
     setSpeichert(true)
     try {
+      // Große Fotos verkleinern (nacheinander, damit das iPhone nicht zu viel Speicher braucht)
+      const vorbereitet = []
+      for (const datei of neueDateien) vorbereitet.push(await belegVorbereiten(datei))
       await buchungSpeichern(
         {
           ...buchung,
@@ -118,7 +162,7 @@ export function Erfassung({ art, buchung, onSchliessen }) {
           kategorie_id: kategorieId,
           notiz,
         },
-        { neueDateien, entfernteBelegIds },
+        { neueDateien: vorbereitet, entfernteBelegIds },
       )
       zeigeMeldung(bearbeiten ? 'Änderungen gespeichert' : t.gespeichert)
       onSchliessen()
@@ -137,7 +181,7 @@ export function Erfassung({ art, buchung, onSchliessen }) {
   return (
     <Blatt
       titel={bearbeiten ? t.bearbeiten : t.neu}
-      onSchliessen={onSchliessen}
+      onSchliessen={schliessenVersuchen}
       voll
       fusszeile={
         <>
@@ -180,7 +224,7 @@ export function Erfassung({ art, buchung, onSchliessen }) {
                   key={b.id}
                   beleg={b}
                   onAnsehen={(beleg, blob) => setAnsicht({ beleg, blob })}
-                  onEntfernen={() => setEntfernteBelegIds((ids) => [...ids, b.id])}
+                  onEntfernen={() => setBelegEntfernen(b)}
                 />
               ))}
               {neueDateien.map((datei, i) => (
@@ -260,7 +304,7 @@ export function Erfassung({ art, buchung, onSchliessen }) {
             autoComplete="off"
             list="anbieter-vorschlaege"
             value={anbieter}
-            onChange={(e) => aendern(setAnbieter, 'anbieter')(e.target.value)}
+            onChange={(e) => anbieterAendern(e.target.value)}
             aria-invalid={Boolean(fehler.anbieter)}
           />
           <datalist id="anbieter-vorschlaege">
@@ -272,7 +316,10 @@ export function Erfassung({ art, buchung, onSchliessen }) {
         </div>
 
         <fieldset>
-          <legend className="mb-2 px-1 text-[14px] font-medium text-ink-2">{t.kategorie}</legend>
+          <legend className="mb-2 px-1 text-[14px] font-medium text-ink-2">
+            {t.kategorie}
+            {kategorieQuelle === 'auto' && <span className="font-normal text-ink-3"> · vorgeschlagen nach Anbieter</span>}
+          </legend>
           <div className="flex flex-wrap gap-2">
             {passendeKategorien.map((k) => {
               const aktiv = k.id === kategorieId
@@ -280,7 +327,7 @@ export function Erfassung({ art, buchung, onSchliessen }) {
                 <button
                   key={k.id}
                   type="button"
-                  onClick={() => aendern(setKategorieId, 'kategorie')(k.id)}
+                  onClick={() => kategorieWaehlen(k.id)}
                   aria-pressed={aktiv}
                   className={`flex min-h-11 items-center gap-2 rounded-full border py-1 pr-3.5 pl-1.5 text-[15px] ${
                     aktiv ? 'border-accent bg-accent-soft font-semibold text-ink' : 'border-line bg-surface text-ink'
@@ -311,6 +358,27 @@ export function Erfassung({ art, buchung, onSchliessen }) {
       </form>
 
       {ansicht && <BelegAnsicht beleg={ansicht.beleg} blob={ansicht.blob} onSchliessen={() => setAnsicht(null)} />}
+      {belegEntfernen && (
+        <Rueckfrage
+          titel="Beleg entfernen?"
+          text={`„${belegEntfernen.dateiname}“ wird beim Speichern endgültig gelöscht.`}
+          bestaetigen="Entfernen"
+          onBestaetigen={() => {
+            setEntfernteBelegIds((ids) => [...ids, belegEntfernen.id])
+            setBelegEntfernen(null)
+          }}
+          onAbbrechen={() => setBelegEntfernen(null)}
+        />
+      )}
+      {verwerfenFragen && (
+        <Rueckfrage
+          titel="Eingaben verwerfen?"
+          text="Du hast noch nicht gespeichert. Deine Eingaben in diesem Formular gehen verloren."
+          bestaetigen="Verwerfen"
+          onBestaetigen={onSchliessen}
+          onAbbrechen={() => setVerwerfenFragen(false)}
+        />
+      )}
     </Blatt>
   )
 }

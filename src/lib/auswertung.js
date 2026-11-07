@@ -80,3 +80,16 @@ export function verfuegbareJahre(buchungen, aktuellesJahr) {
   const jahre = new Set([aktuellesJahr, ...buchungen.map(jahrVon)])
   return [...jahre].sort((a, b) => b - a)
 }
+
+/**
+ * Kategorie, die zuletzt mit diesem Anbieter benutzt wurde (Groß-/Kleinschreibung egal).
+ * Hilft beim schnellen Erfassen: "Apple" -> "Apple-Entwicklerkonto".
+ */
+export function kategorieFuerAnbieter(buchungen, art, anbieter) {
+  const gesucht = (anbieter || '').trim().toLocaleLowerCase('de')
+  if (!gesucht) return null
+  const treffer = buchungen.filter(
+    (b) => b.art === art && b.kategorie_id && (b.anbieter_quelle || '').trim().toLocaleLowerCase('de') === gesucht,
+  )
+  return sortiereNeuesteZuerst(treffer)[0]?.kategorie_id ?? null
+}

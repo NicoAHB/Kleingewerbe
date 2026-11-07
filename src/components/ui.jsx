@@ -17,12 +17,22 @@ function useScrollSperre() {
   }, [])
 }
 
+// Escape schließt nur das oberste Fenster, nicht alle darunter
+const offeneFenster = []
+
 function useEscape(onSchliessen) {
+  const id = useId()
   useEffect(() => {
-    const handler = (e) => e.key === 'Escape' && onSchliessen?.()
+    offeneFenster.push(id)
+    return () => offeneFenster.splice(offeneFenster.indexOf(id), 1)
+  }, [id])
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'Escape' && offeneFenster.at(-1) === id) onSchliessen?.()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onSchliessen])
+  }, [id, onSchliessen])
 }
 
 /** Blatt, das von unten hereinfährt. fusszeile bleibt unten sichtbar (z. B. Speichern). */

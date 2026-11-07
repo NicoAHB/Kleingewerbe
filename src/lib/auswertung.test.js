@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  kategorieFuerAnbieter,
   filterBuchungen,
   monatsBilanz,
   nachMonatGruppieren,
@@ -66,5 +67,23 @@ describe('Sortierung und Gruppen', () => {
 
   it('listet Jahre absteigend inklusive aktuellem Jahr', () => {
     expect(verfuegbareJahre(buchungen, 2027)).toEqual([2027, 2026, 2025])
+  })
+})
+
+describe('kategorieFuerAnbieter', () => {
+  const liste = [
+    b('a', 'ausgabe', '2026-10-01', 100, 'k-software', 'Apple'),
+    b('b', 'ausgabe', '2026-11-01', 100, 'k-apple', 'Apple'),
+    b('c', 'einnahme', '2026-11-05', 100, 'k-abo', 'Apple'),
+  ]
+  it('nimmt die zuletzt benutzte Kategorie, unabhängig von Groß-/Kleinschreibung', () => {
+    expect(kategorieFuerAnbieter(liste, 'ausgabe', ' apple ')).toBe('k-apple')
+  })
+  it('trennt Ausgaben und Einnahmen', () => {
+    expect(kategorieFuerAnbieter(liste, 'einnahme', 'Apple')).toBe('k-abo')
+  })
+  it('liefert nichts bei unbekanntem oder leerem Anbieter', () => {
+    expect(kategorieFuerAnbieter(liste, 'ausgabe', 'Figma')).toBeNull()
+    expect(kategorieFuerAnbieter(liste, 'ausgabe', '')).toBeNull()
   })
 })

@@ -30,6 +30,11 @@ function speicherImArbeitsspeicher() {
     getAll: async (s) => [...store(s).values()],
     put: async (s, value, key) => void store(s).set(key ?? value.id, value),
     delete: async (s, key) => void store(s).delete(key),
+    transaktion: async (_stores, fn) =>
+      fn((s) => ({
+        put: (value, key) => store(s).set(key ?? value.id, value),
+        delete: (key) => store(s).delete(key),
+      })),
   }
 }
 
@@ -42,7 +47,7 @@ async function oeffnen() {
         db.createObjectStore('buchungen', { keyPath: 'id' })
         const belege = db.createObjectStore('belege', { keyPath: 'id' })
         belege.createIndex('buchung_id', 'buchung_id')
-        db.createObjectStore('beleg_dateien') // Schlüssel = Beleg-ID, Wert = Blob
+        db.createObjectStore('beleg_dateien') // Schlüssel = Beleg-ID, Wert = { typ, daten }
       },
     })
     // Browser bitten, die Daten nicht automatisch zu löschen
@@ -53,6 +58,25 @@ async function oeffnen() {
       getAll: (s) => db.getAll(s),
       put: (s, value, key) => db.put(s, value, key),
       delete: (s, key) => db.delete(s, key),
+      // Mehrere Änderungen in einem Rutsch: entweder alles wird gespeichert oder nichts
+      transaktion: async (stores, fn) => {
+        const tx = db.transaction(stores, 'readwrite')
+        // Einzelfehler zeigen sich gesammelt in tx.done – hier nur nicht unbehandelt lassen
+        const store = (s) => {
+          const os = tx.objectStore(s)
+          return {
+            put: (value, key) => void os.put(value, key).catch(() => {}),
+            delete: (key) => void os.delete(key).catch(() => {}),
+          }
+        }
+        try {
+          fn(store)
+        } catch (fehler) {
+          tx.abort()
+          throw fehler
+        }
+        await tx.done
+      },
     }
   } catch {
     return speicherImArbeitsspeicher()
@@ -102,14 +126,10 @@ export async function buchungSpeichern(daten, { neueDateien = [], entfernteBeleg
     wiederkehrend_id: daten.wiederkehrend_id ?? null,
     erstellt_am: daten.erstellt_am || jetzt,
   }
-  await db.put('buchungen', buchung)
-
-  for (const id of entfernteBelegIds) {
-    await db.delete('belege', id)
-    await db.delete('beleg_dateien', id)
-  }
-
+  // Dateien vorher vollständig einlesen: Safari speichert reine Daten zuverlässiger als File-Objekte,
+  // und innerhalb einer Transaktion darf nicht auf andere Dinge gewartet werden.
   const neueBelege = []
+  const dateiInhalte = []
   for (const datei of neueDateien) {
     const beleg = {
       id: neueId(),
@@ -119,25 +139,39 @@ export async function buchungSpeichern(daten, { neueDateien = [], entfernteBeleg
       groesse: datei.size,
       erstellt_am: jetzt,
     }
-    await db.put('beleg_dateien', datei, beleg.id)
-    await db.put('belege', beleg)
     neueBelege.push(beleg)
+    dateiInhalte.push({ id: beleg.id, typ: beleg.dateityp, daten: await datei.arrayBuffer() })
   }
+
+  await db.transaktion(['buchungen', 'belege', 'beleg_dateien'], (store) => {
+    store('buchungen').put(buchung)
+    for (const id of entfernteBelegIds) {
+      store('belege').delete(id)
+      store('beleg_dateien').delete(id)
+    }
+    for (const beleg of neueBelege) store('belege').put(beleg)
+    for (const { id, typ, daten } of dateiInhalte) store('beleg_dateien').put({ typ, daten }, id)
+  })
   return { buchung, neueBelege }
 }
 
 export async function buchungLoeschen(id, belegIds) {
   const db = await speicher()
-  for (const belegId of belegIds) {
-    await db.delete('belege', belegId)
-    await db.delete('beleg_dateien', belegId)
-  }
-  await db.delete('buchungen', id)
+  await db.transaktion(['buchungen', 'belege', 'beleg_dateien'], (store) => {
+    for (const belegId of belegIds) {
+      store('belege').delete(belegId)
+      store('beleg_dateien').delete(belegId)
+    }
+    store('buchungen').delete(id)
+  })
 }
 
 export async function belegDatei(belegId) {
   const db = await speicher()
-  return db.get('beleg_dateien', belegId)
+  const eintrag = await db.get('beleg_dateien', belegId)
+  if (!eintrag) return null
+  if (eintrag instanceof Blob) return eintrag // vor Version 0.2 als Blob gespeichert
+  return new Blob([eintrag.daten], { type: eintrag.typ })
 }
 
 export async function kategorieSpeichern(daten) {

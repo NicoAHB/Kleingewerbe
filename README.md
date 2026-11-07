@@ -21,6 +21,14 @@ Außerdem: Suche und Filter (Jahr, Monat, Kategorie) mit Summen, Beleg ansehen, 
 Löschen immer mit Rückfrage, Kategorien verwalten, Firmenname und Logo in den Einstellungen,
 Hinweise „keine Steuerberatung“ und Aufbewahrungsfristen. Dunkelmodus folgt der iPhone-Einstellung.
 
+### Version 0.2 – Optimierungen
+
+- Beleg-Fotos werden beim Speichern auf höchstens 2400 px (lange Kante) verkleinert – gut lesbar, aber meist nur ein Bruchteil der Dateigröße. PDFs bleiben unverändert.
+- Belege werden als reine Daten und zusammen mit der Buchung in einem Schritt gespeichert (alles oder nichts). Ältere Einträge bleiben lesbar.
+- Bei einem bekannten Anbieter wird die zuletzt benutzte Kategorie vorgeschlagen; eine selbst gewählte Kategorie bleibt unangetastet.
+- Rückfrage, bevor ein gespeicherter Beleg entfernt oder ein Formular mit ungespeicherten Eingaben geschlossen wird.
+- Kein automatisches Hineinzoomen mehr beim Tippen auf die Filter (iPhone).
+
 **Wichtig:** Bis Schritt 2 (Supabase) liegen alle Daten nur lokal im Browser des Geräts (IndexedDB).
 Für die echte Buchführung erst nach Schritt 2 verwenden.
 
@@ -29,7 +37,7 @@ Für die echte Buchführung erst nach Schritt 2 verwenden.
 ```bash
 npm install
 npm run dev        # lokale Entwicklung
-npm test           # Rechen- und Formattests
+npm test           # Rechen-, Format- und Bildtests
 npm run build      # PWA nach dist/
 npm run build:vorschau   # eine einzelne HTML-Datei mit Beispieldaten nach dist-vorschau/
 ```

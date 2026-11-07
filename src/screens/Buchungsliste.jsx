@@ -80,7 +80,7 @@ export function Buchungsliste({ art, filter, setFilter, onOeffnen }) {
         <div className="grid grid-cols-2 gap-2">
           <label>
             <span className="sr-only">Jahr</span>
-            <select className="feld min-h-11 text-[15px]" value={filter.jahr} onChange={aendern('jahr')}>
+            <select className="feld min-h-11" value={filter.jahr} onChange={aendern('jahr')}>
               <option value="">Alle Jahre</option>
               {jahre.map((j) => (
                 <option key={j} value={j}>
@@ -91,7 +91,7 @@ export function Buchungsliste({ art, filter, setFilter, onOeffnen }) {
           </label>
           <label>
             <span className="sr-only">Monat</span>
-            <select className="feld min-h-11 text-[15px]" value={filter.monat} onChange={aendern('monat')}>
+            <select className="feld min-h-11" value={filter.monat} onChange={aendern('monat')}>
               <option value="">Alle Monate</option>
               {MONATE.map((name, i) => (
                 <option key={name} value={i + 1}>
@@ -102,7 +102,7 @@ export function Buchungsliste({ art, filter, setFilter, onOeffnen }) {
           </label>
           <label className="col-span-2">
             <span className="sr-only">{t.kategorie}</span>
-            <select className="feld min-h-11 text-[15px]" value={filter.kategorieId} onChange={aendern('kategorieId')}>
+            <select className="feld min-h-11" value={filter.kategorieId} onChange={aendern('kategorieId')}>
               <option value="">Alle {art === 'ausgabe' ? 'Kategorien' : 'Quellen'}</option>
               {kategorienAuswahl.map((k) => (
                 <option key={k.id} value={k.id}>

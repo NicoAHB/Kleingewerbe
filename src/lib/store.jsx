@@ -6,6 +6,23 @@ export const IST_VORSCHAU = import.meta.env.MODE === 'vorschau'
 
 const AppContext = createContext(null)
 
+// Nur einmal laden (React ruft Effekte in der Entwicklung doppelt auf)
+let startPromise = null
+function startdatenLaden() {
+  startPromise ??= (async () => {
+    let daten = await db.allesLaden()
+    if (IST_VORSCHAU && !daten.einstellungen.beispieldatenGeladen && daten.buchungen.length === 0) {
+      for (const { dateien, ...b } of beispielBuchungen()) {
+        await db.buchungSpeichern({ ...b, erstellt_am: `${b.datum}T12:00:00.000Z` }, { neueDateien: dateien || [] })
+      }
+      await db.einstellungenSpeichern({ ...daten.einstellungen, beispieldatenGeladen: true })
+      daten = await db.allesLaden()
+    }
+    return daten
+  })()
+  return startPromise
+}
+
 export function AppProvider({ children }) {
   const [zustand, setZustand] = useState({
     laden: true,
@@ -29,20 +46,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     let aktiv = true
-    ;(async () => {
-      let daten = await db.allesLaden()
-      if (IST_VORSCHAU && !daten.einstellungen.beispieldatenGeladen && daten.buchungen.length === 0) {
-        for (const { dateien, ...b } of beispielBuchungen()) {
-          await db.buchungSpeichern(
-            { ...b, erstellt_am: `${b.datum}T12:00:00.000Z` },
-            { neueDateien: dateien || [] },
-          )
-        }
-        await db.einstellungenSpeichern({ ...daten.einstellungen, beispieldatenGeladen: true })
-        daten = await db.allesLaden()
-      }
-      if (aktiv) setZustand({ ...daten, laden: false })
-    })()
+    startdatenLaden().then((daten) => aktiv && setZustand({ ...daten, laden: false }))
     return () => {
       aktiv = false
     }
