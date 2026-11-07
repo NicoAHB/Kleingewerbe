@@ -6,6 +6,23 @@ export const IST_VORSCHAU = import.meta.env.MODE === 'vorschau'
 
 const AppContext = createContext(null)
 
+// Nur einmal laden (React ruft Effekte in der Entwicklung doppelt auf)
+let startPromise = null
+function startdatenLaden() {
+  startPromise ??= (async () => {
+    let daten = await db.allesLaden()
+    if (IST_VORSCHAU && !daten.einstellungen.beispieldatenGeladen && daten.buchungen.length === 0) {
+      for (const { dateien, ...b } of beispielBuchungen()) {
+        await db.buchungSpeichern({ ...b, erstellt_am: `${b.datum}T12:00:00.000Z` }, { neueDateien: dateien || [] })
+      }
+      await db.einstellungenSpeichern({ ...daten.einstellungen, beispieldatenGeladen: true })
+      daten = await db.allesLaden()
+    }
+    return daten
+  })()
+  return startPromise
+}
+
 export function AppProvider({ children }) {
   const [zustand, setZustand] = useState({
     laden: true,
@@ -29,20 +46,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     let aktiv = true
-    ;(async () => {
-      let daten = await db.allesLaden()
-      if (IST_VORSCHAU && !daten.einstellungen.beispieldatenGeladen && daten.buchungen.length === 0) {
-        for (const { dateien, ...b } of beispielBuchungen()) {
-          await db.buchungSpeichern(
-            { ...b, erstellt_am: `${b.datum}T12:00:00.000Z` },
-            { neueDateien: dateien || [] },
-          )
-        }
-        await db.einstellungenSpeichern({ ...daten.einstellungen, beispieldatenGeladen: true })
-        daten = await db.allesLaden()
-      }
-      if (aktiv) setZustand({ ...daten, laden: false })
-    })()
+    startdatenLaden().then((daten) => aktiv && setZustand({ ...daten, laden: false }))
     return () => {
       aktiv = false
     }
@@ -89,6 +93,21 @@ export function AppProvider({ children }) {
     setZustand((z) => ({ ...z, einstellungen: neu }))
   }, [])
 
+  /** Ersetzt alle Daten durch eine geprüfte Sicherung und lädt neu */
+  const sicherungWiederherstellen = useCallback(async (sicherung) => {
+    await db.allesErsetzen({
+      ...sicherung,
+      einstellungen: {
+        ...db.STANDARD_EINSTELLUNGEN,
+        ...sicherung.einstellungen,
+        letzteSicherung: sicherung.erstellt_am || null,
+        beispieldatenGeladen: true,
+      },
+    })
+    const daten = await db.allesLaden()
+    setZustand({ ...daten, laden: false })
+  }, [])
+
   const kategorienById = useMemo(
     () => Object.fromEntries(zustand.kategorien.map((k) => [k.id, k])),
     [zustand.kategorien],
@@ -112,6 +131,9 @@ export function AppProvider({ children }) {
     kategorieLoeschen,
     einstellungenSpeichern,
     belegDatei: db.belegDatei,
+    sicherungLesen: db.sicherungLesen,
+    speicherStand: db.speicherStand,
+    sicherungWiederherstellen,
   }
 
   return <AppContext.Provider value={wert}>{children}</AppContext.Provider>

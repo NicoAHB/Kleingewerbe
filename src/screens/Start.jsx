@@ -3,13 +3,30 @@ import { useApp } from '../lib/store.jsx'
 import { euro, monatsName } from '../lib/format.js'
 import { monatsBilanz, monatVon, jahrVon, sortiereNeuesteZuerst, summenNachKategorie } from '../lib/auswertung.js'
 import { farbVariable } from '../lib/kategorien.js'
+import { sicherungFaellig } from '../lib/sicherung.js'
 import { Abschnitt, LeererZustand } from '../components/ui.jsx'
 import { Kreisdiagramm } from '../components/Kreisdiagramm.jsx'
 import { BuchungZeile } from '../components/Buchung.jsx'
-import { IconPlus, IconWeiter, IconZurueck } from '../components/Icons.jsx'
+import { IconPlus, IconSchild, IconWeiter, IconZurueck } from '../components/Icons.jsx'
 
-export function Start({ onOeffnen }) {
-  const { buchungen, kategorienById } = useApp()
+function SicherungsErinnerung({ tage, onSichern }) {
+  return (
+    <section className="flex items-center gap-3 rounded-[20px] bg-accent-soft p-3.5 pl-4">
+      <IconSchild size={22} className="shrink-0 text-accent" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold">{tage == null ? 'Noch keine Sicherung' : `Letzte Sicherung vor ${tage} Tagen`}</p>
+        <p className="text-[13px] text-ink-2">Deine Daten liegen nur auf diesem Gerät.</p>
+      </div>
+      <button type="button" onClick={onSichern} className="h-10 shrink-0 rounded-full bg-accent px-4 text-[15px] font-semibold text-on-accent">
+        Sichern
+      </button>
+    </section>
+  )
+}
+
+export function Start({ onOeffnen, onSichern }) {
+  const { buchungen, kategorienById, einstellungen } = useApp()
+  const erinnerung = sicherungFaellig(einstellungen.letzteSicherung, buchungen)
   const heute = new Date()
   const [zeitraum, setZeitraum] = useState({ jahr: heute.getFullYear(), monat: heute.getMonth() + 1 })
   const { jahr, monat } = zeitraum
@@ -48,6 +65,8 @@ export function Start({ onOeffnen }) {
 
   return (
     <div className="flex flex-col gap-7 pt-2">
+      {erinnerung.faellig && <SicherungsErinnerung tage={erinnerung.tage} onSichern={onSichern} />}
+
       {/* Monatsbilanz */}
       <section className="rounded-[20px] bg-surface p-4 pb-5">
         <div className="mb-3 flex items-center justify-between">

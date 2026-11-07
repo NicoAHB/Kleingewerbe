@@ -5,15 +5,16 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
 // Zwei Build-Arten:
-//  - normal (npm run build): installierbare Web-App (PWA) für GitHub Pages
+//  - normal (npm run build): installierbare Web-App (PWA) für GitHub Pages oder jeden anderen Webspeicher
 //  - "vorschau" (npm run build:vorschau): eine einzige HTML-Datei mit Beispieldaten,
 //    zum schnellen Anschauen ohne Server
 export default defineConfig(({ mode }) => {
   const vorschau = mode === 'vorschau'
 
   return {
-    // Auf GitHub Pages liegt die App unter /<Repo-Name>/ – der Workflow setzt BASE_PATH.
-    base: vorschau ? './' : process.env.BASE_PATH || '/',
+    // Relative Pfade: Der Inhalt von dist/ läuft auf GitHub Pages genauso wie auf jedem anderen
+    // Webspeicher, egal in welchem Ordner. (BASE_PATH nur setzen, wenn ein fester Pfad nötig ist.)
+    base: vorschau ? './' : process.env.BASE_PATH || './',
     plugins: [
       react(),
       tailwindcss(),
