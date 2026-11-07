@@ -1,7 +1,6 @@
-// Lokaler Speicher (IndexedDB) für den Entwurf.
-// Die Funktionen entsprechen dem Datenmodell aus dem Konzept (buchungen, belege, kategorien,
-// einstellungen). In Schritt 2 wird diese Datei durch eine Supabase-Variante mit denselben
-// Funktionen ersetzt – die Bildschirme bleiben unverändert.
+// Speicher auf dem Gerät (IndexedDB). Alle Daten bleiben auf dem iPhone/iPad –
+// es gibt keinen Server. Gegen Verlust schützt die Sicherung (siehe sicherung.js).
+// Die Struktur folgt dem Datenmodell aus dem Konzept (buchungen, belege, kategorien, einstellungen).
 
 import { openDB } from 'idb'
 import { STANDARD_KATEGORIEN } from './kategorien.js'
@@ -12,6 +11,21 @@ const DB_VERSION = 1
 export const STANDARD_EINSTELLUNGEN = {
   firmenname: 'NvF Digital',
   logo: null, // eigenes Logo als Blob (optional)
+  letzteSicherung: null, // Zeitpunkt der letzten Sicherung (ISO)
+}
+
+const ALLE_STORES = ['einstellungen', 'kategorien', 'buchungen', 'belege', 'beleg_dateien']
+
+// Dateien werden als { typ, daten: ArrayBuffer } gespeichert; ältere Einträge können noch Blobs sein.
+function alsBlob(eintrag) {
+  if (!eintrag) return null
+  if (eintrag instanceof Blob) return eintrag
+  return new Blob([eintrag.daten], { type: eintrag.typ })
+}
+
+async function alsDaten(blob) {
+  if (!blob) return null
+  return { typ: blob.type || 'application/octet-stream', daten: await blob.arrayBuffer() }
 }
 
 function neueId() {
@@ -34,6 +48,7 @@ function speicherImArbeitsspeicher() {
       fn((s) => ({
         put: (value, key) => store(s).set(key ?? value.id, value),
         delete: (key) => store(s).delete(key),
+        clear: () => store(s).clear(),
       })),
   }
 }
@@ -67,6 +82,7 @@ async function oeffnen() {
           return {
             put: (value, key) => void os.put(value, key).catch(() => {}),
             delete: (key) => void os.delete(key).catch(() => {}),
+            clear: () => void os.clear().catch(() => {}),
           }
         }
         try {
@@ -97,7 +113,8 @@ export async function allesLaden() {
     for (const k of STANDARD_KATEGORIEN) await db.put('kategorien', k)
     kategorien = STANDARD_KATEGORIEN
   }
-  const einstellungen = { ...STANDARD_EINSTELLUNGEN, ...((await db.get('einstellungen', 'app')) || {}) }
+  const gespeichert = (await db.get('einstellungen', 'app')) || {}
+  const einstellungen = { ...STANDARD_EINSTELLUNGEN, ...gespeichert, logo: alsBlob(gespeichert.logo) }
   return {
     dauerhaft: db.dauerhaft,
     kategorien,
@@ -168,10 +185,7 @@ export async function buchungLoeschen(id, belegIds) {
 
 export async function belegDatei(belegId) {
   const db = await speicher()
-  const eintrag = await db.get('beleg_dateien', belegId)
-  if (!eintrag) return null
-  if (eintrag instanceof Blob) return eintrag // vor Version 0.2 als Blob gespeichert
-  return new Blob([eintrag.daten], { type: eintrag.typ })
+  return alsBlob(await db.get('beleg_dateien', belegId))
 }
 
 export async function kategorieSpeichern(daten) {
@@ -195,6 +209,54 @@ export async function kategorieLoeschen(id) {
 
 export async function einstellungenSpeichern(einstellungen) {
   const db = await speicher()
-  await db.put('einstellungen', einstellungen, 'app')
+  await db.put('einstellungen', { ...einstellungen, logo: await alsDaten(einstellungen.logo) }, 'app')
   return einstellungen
+}
+
+/** Alles inklusive Beleg-Dateien – für die Sicherung. dateien: { [belegId]: Blob } */
+export async function sicherungLesen() {
+  const db = await speicher()
+  const daten = await allesLaden()
+  const dateien = {}
+  for (const beleg of daten.belege) {
+    const blob = alsBlob(await db.get('beleg_dateien', beleg.id))
+    if (blob) dateien[beleg.id] = blob
+  }
+  return { ...daten, dateien }
+}
+
+/**
+ * Ersetzt alle Daten auf dem Gerät durch eine Sicherung – in einem Schritt:
+ * Klappt etwas nicht, bleibt der alte Stand vollständig erhalten.
+ */
+export async function allesErsetzen({ einstellungen, kategorien, buchungen, belege, dateien }) {
+  const db = await speicher()
+  const inhalte = []
+  for (const beleg of belege) {
+    if (dateien[beleg.id]) inhalte.push([beleg, await alsDaten(dateien[beleg.id])])
+  }
+  const logo = await alsDaten(einstellungen.logo)
+  await db.transaktion(ALLE_STORES, (store) => {
+    for (const name of ALLE_STORES) store(name).clear()
+    store('einstellungen').put({ ...einstellungen, logo }, 'app')
+    for (const k of kategorien) store('kategorien').put(k)
+    for (const b of buchungen) store('buchungen').put(b)
+    for (const [beleg, inhalt] of inhalte) {
+      store('belege').put(beleg)
+      store('beleg_dateien').put(inhalt, beleg.id)
+    }
+  })
+}
+
+/** Belegter Speicher auf dem Gerät (sofern der Browser es verrät) */
+export async function speicherStand() {
+  try {
+    const [schaetzung, dauerhaft] = await Promise.all([
+      navigator.storage?.estimate?.(),
+      navigator.storage?.persisted?.(),
+    ])
+    return { belegt: schaetzung?.usage ?? null, dauerhaft: dauerhaft ?? null }
+  } catch {
+    return { belegt: null, dauerhaft: null }
+  }
 }

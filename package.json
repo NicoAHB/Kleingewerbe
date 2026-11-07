@@ -1,7 +1,7 @@
 {
   "name": "nvf-finanzen",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "NvF Finanzen – Einnahmen-/Ausgaben-App für NvF Digital",
   "scripts": {
@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "idb": "^8.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

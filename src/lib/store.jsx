@@ -93,6 +93,21 @@ export function AppProvider({ children }) {
     setZustand((z) => ({ ...z, einstellungen: neu }))
   }, [])
 
+  /** Ersetzt alle Daten durch eine geprüfte Sicherung und lädt neu */
+  const sicherungWiederherstellen = useCallback(async (sicherung) => {
+    await db.allesErsetzen({
+      ...sicherung,
+      einstellungen: {
+        ...db.STANDARD_EINSTELLUNGEN,
+        ...sicherung.einstellungen,
+        letzteSicherung: sicherung.erstellt_am || null,
+        beispieldatenGeladen: true,
+      },
+    })
+    const daten = await db.allesLaden()
+    setZustand({ ...daten, laden: false })
+  }, [])
+
   const kategorienById = useMemo(
     () => Object.fromEntries(zustand.kategorien.map((k) => [k.id, k])),
     [zustand.kategorien],
@@ -116,6 +131,9 @@ export function AppProvider({ children }) {
     kategorieLoeschen,
     einstellungenSpeichern,
     belegDatei: db.belegDatei,
+    sicherungLesen: db.sicherungLesen,
+    speicherStand: db.speicherStand,
+    sicherungWiederherstellen,
   }
 
   return <AppContext.Provider value={wert}>{children}</AppContext.Provider>

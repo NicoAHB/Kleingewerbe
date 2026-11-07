@@ -74,6 +74,7 @@ export function App() {
   const [detailId, setDetailId] = useState(null)
   const [filterAusgaben, setFilterAusgaben] = useState(leererFilter)
   const [filterEinnahmen, setFilterEinnahmen] = useState(leererFilter)
+  const [mehrSeite, setMehrSeite] = useState(null) // Unterseite im Tab „Mehr“
   const eigenesLogo = useBlobUrl(einstellungen.logo)
 
   useEffect(() => {
@@ -84,6 +85,7 @@ export function App() {
 
   function wechsleTab(id) {
     if (id === tab) {
+      if (id === 'mehr') setMehrSeite(null) // erneutes Tippen führt zurück zur Übersicht
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
@@ -97,6 +99,20 @@ export function App() {
   }
 
   const aktuellerTab = TABS.find((t) => t.id === tab)
+
+  // Auf den Tabs Ausgaben/Einnahmen ist klar, was erfasst wird – dort ohne Zwischenfrage
+  const plusArt = tab === 'ausgaben' ? 'ausgabe' : tab === 'einnahmen' ? 'einnahme' : null
+  const plusText = plusArt === 'ausgabe' ? 'Ausgabe' : plusArt === 'einnahme' ? 'Einnahme' : null
+
+  function plusGetippt() {
+    if (plusArt) setErfassung(plusArt)
+    else setAuswahlOffen(true)
+  }
+
+  function zurSicherung() {
+    setMehrSeite('sicherung')
+    wechsleTab('mehr')
+  }
 
   if (laden) return <Ladebildschirm />
 
@@ -122,7 +138,7 @@ export function App() {
             Dieser Browser erlaubt kein dauerhaftes Speichern. Einträge gehen beim Schließen verloren.
           </p>
         )}
-        {tab === 'start' && <Start onOeffnen={setDetailId} />}
+        {tab === 'start' && <Start onOeffnen={setDetailId} onSichern={zurSicherung} />}
         {tab === 'ausgaben' && (
           <Buchungsliste art="ausgabe" filter={filterAusgaben} setFilter={setFilterAusgaben} onOeffnen={setDetailId} />
         )}
@@ -130,21 +146,25 @@ export function App() {
           <Buchungsliste art="einnahme" filter={filterEinnahmen} setFilter={setFilterEinnahmen} onOeffnen={setDetailId} />
         )}
         {tab === 'auswertung' && <Auswertung />}
-        {tab === 'mehr' && <Mehr />}
+        {tab === 'mehr' && <Mehr seite={mehrSeite} setSeite={setMehrSeite} />}
       </main>
 
-      {/* Großer runder Plus-Knopf, mit dem Daumen erreichbar */}
+      {/* Großer runder Plus-Knopf, mit dem Daumen erreichbar.
+          Auf Ausgaben/Einnahmen zeigt er, was er öffnet, und fragt nicht nach. */}
       <button
         type="button"
-        onClick={() => setAuswahlOffen(true)}
-        className="fixed z-20 grid h-16 w-16 place-items-center rounded-full bg-accent text-on-accent shadow-[0_8px_24px_-6px_color-mix(in_srgb,var(--accent)_60%,transparent)] active:scale-95"
+        onClick={plusGetippt}
+        className={`fixed z-20 flex h-16 items-center justify-center gap-1.5 rounded-full bg-accent text-on-accent shadow-[0_8px_24px_-6px_color-mix(in_srgb,var(--accent)_60%,transparent)] active:scale-95 ${
+          plusText ? 'pr-6 pl-5 text-[17px] font-semibold' : 'w-16'
+        }`}
         style={{
           right: 'max(20px, calc(env(safe-area-inset-right, 0px) + 16px), calc((100vw - 36rem) / 2 + 20px))',
           bottom: 'calc(84px + env(safe-area-inset-bottom, 0px))',
         }}
-        aria-label="Neuer Eintrag"
+        aria-label={plusText ? `Neue ${plusText}` : 'Neuer Eintrag'}
       >
-        <IconPlus size={30} strokeWidth={2.2} />
+        <IconPlus size={plusText ? 26 : 30} strokeWidth={2.2} />
+        {plusText}
       </button>
 
       <nav

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { useApp, kategorienDerArt, IST_VORSCHAU } from '../lib/store.jsx'
 import { FARBEN, farbVariable } from '../lib/kategorien.js'
-import { Abschnitt, Blatt, KategorieSymbol, Rueckfrage } from '../components/ui.jsx'
+import { Abschnitt, Blatt, KategorieSymbol, Rueckfrage, Unterseite } from '../components/ui.jsx'
+import { SicherungSeite, wannText } from './Sicherung.jsx'
 import { useBlobUrl } from '../components/BelegAnzeige.jsx'
 import standardLogo from '../assets/logo.svg'
 import {
@@ -13,7 +14,6 @@ import {
   IconWeiter,
   IconWiederholen,
   IconZahnrad,
-  IconZurueck,
 } from '../components/Icons.jsx'
 
 function MenuePunkt({ Icon, titel, text, onClick, spaeter }) {
@@ -40,34 +40,27 @@ function MenuePunkt({ Icon, titel, text, onClick, spaeter }) {
   )
 }
 
-function Unterseite({ titel, onZurueck, children }) {
-  return (
-    <div className="flex flex-col gap-4 pt-1">
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onZurueck}
-          className="-ml-2 flex h-10 items-center gap-0.5 rounded-full pr-3 pl-1 font-medium text-accent"
-        >
-          <IconZurueck size={22} /> Mehr
-        </button>
-      </div>
-      <h2 className="px-1 font-display text-[24px] font-semibold">{titel}</h2>
-      {children}
-    </div>
-  )
-}
-
-export function Mehr() {
-  const [seite, setSeite] = useState(null)
+export function Mehr({ seite, setSeite }) {
+  const { einstellungen } = useApp()
 
   if (seite === 'kategorien') return <KategorienSeite onZurueck={() => setSeite(null)} />
   if (seite === 'einstellungen') return <EinstellungenSeite onZurueck={() => setSeite(null)} />
+  if (seite === 'sicherung') return <SicherungSeite onZurueck={() => setSeite(null)} />
 
   return (
     <div className="flex flex-col gap-7 pt-2">
       <div className="divide-y divide-line overflow-hidden rounded-[20px] bg-surface">
         <MenuePunkt Icon={IconEtikett} titel="Kategorien" text="Ausgaben-Kategorien und Einnahme-Quellen" onClick={() => setSeite('kategorien')} />
+        <MenuePunkt
+          Icon={IconSchild}
+          titel="Sicherung"
+          text={
+            einstellungen.letzteSicherung
+              ? `Zuletzt: ${wannText(einstellungen.letzteSicherung)}`
+              : 'Sichern und wiederherstellen, z. B. auf dem iPad'
+          }
+          onClick={() => setSeite('sicherung')}
+        />
         <MenuePunkt Icon={IconZahnrad} titel="Einstellungen" text="Firmenname und Logo" onClick={() => setSeite('einstellungen')} />
         <MenuePunkt Icon={IconWiederholen} titel="Wiederkehrende Kosten" spaeter="Phase 2" />
         <MenuePunkt Icon={IconExport} titel="Export" text="PDF, CSV, Steuerberater-Paket" spaeter="Phase 2" />
@@ -94,7 +87,7 @@ export function Mehr() {
             <span>
               {IST_VORSCHAU
                 ? 'Vorschau: Alle Einträge bleiben nur in diesem Browser.'
-                : 'Entwurf: Alle Einträge liegen bisher nur auf diesem Gerät. Mit Schritt 2 kommen Login, PIN und die gesicherte Ablage in Supabase.'}
+                : 'Alle Einträge liegen nur auf diesem Gerät, nichts wird an einen Server geschickt. Gegen Verlust hilft die Sicherung.'}
             </span>
           </p>
         </div>
@@ -325,8 +318,8 @@ function EinstellungenSeite({ onZurueck }) {
       <Abschnitt titel="Kommt später">
         <div className="divide-y divide-line rounded-[20px] bg-surface text-[15px]">
           <div className="flex justify-between gap-3 px-4 py-3">
-            <span>Login und App-PIN</span>
-            <span className="text-ink-3">Schritt 2</span>
+            <span>App-PIN</span>
+            <span className="text-ink-3">später</span>
           </div>
           <div className="flex justify-between gap-3 px-4 py-3">
             <span>Kleinunternehmer-Grenzen</span>

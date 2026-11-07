@@ -1,6 +1,6 @@
 import { useEffect, useId } from 'react'
 import { createPortal } from 'react-dom'
-import { IconSchliessen } from './Icons.jsx'
+import { IconSchliessen, IconZurueck } from './Icons.jsx'
 import { farbVariable } from '../lib/kategorien.js'
 import { euro } from '../lib/format.js'
 
@@ -158,7 +158,7 @@ export function Meldung({ text }) {
   return createPortal(
     <div
       className="pointer-events-none fixed inset-x-0 z-[60] flex justify-center px-4"
-      style={{ bottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' }}
+      style={{ bottom: 'calc(160px + env(safe-area-inset-bottom, 0px))' }}
       role="status"
     >
       <div className="blatt-animation rounded-full bg-ink px-4 py-2.5 text-[15px] font-medium text-bg shadow-lg">{text}</div>
@@ -178,5 +178,24 @@ export function Abschnitt({ titel, aktion, children, className = '' }) {
       )}
       {children}
     </section>
+  )
+}
+
+/** Unterseite im Tab „Mehr“ mit Zurück-Knopf */
+export function Unterseite({ titel, onZurueck, children }) {
+  return (
+    <div className="flex flex-col gap-4 pt-1">
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onZurueck}
+          className="-ml-2 flex h-10 items-center gap-0.5 rounded-full pr-3 pl-1 font-medium text-accent"
+        >
+          <IconZurueck size={22} /> Mehr
+        </button>
+      </div>
+      <h2 className="px-1 font-display text-[24px] font-semibold">{titel}</h2>
+      {children}
+    </div>
   )
 }
